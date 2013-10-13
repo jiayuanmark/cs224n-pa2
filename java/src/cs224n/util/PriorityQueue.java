@@ -19,6 +19,14 @@ public class PriorityQueue <E> implements Iterator<E>, Serializable, Cloneable {
   List<E> elements;
   double[] priorities;
 
+  public double[] getPriorities() {
+	return priorities;
+  }
+
+  public List<E> getElements() {
+	return elements;
+  }
+  
   protected void grow(int newCapacity) {
     List<E> newElements = new ArrayList<E>(newCapacity);
     double[] newPriorities = new double[newCapacity];
