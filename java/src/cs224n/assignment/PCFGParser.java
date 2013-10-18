@@ -15,36 +15,43 @@ public class PCFGParser implements Parser {
     private Lexicon lexicon;
     
     
-    // 
+    // Data structure 
     private int [][] scoreIdx;
     private List<HashMap<String, Double>> scoreTable;
     private List<HashMap<String, Triplet<Integer, String, String>>> backTable;
     
     
-    
+    // Training
     public void train(List<Tree<String>> trainTrees) {
     	List<Tree<String>> binarizedTrees = new ArrayList<Tree<String>>();
     	for (Tree<String> tree : trainTrees) {
     		binarizedTrees.add(TreeAnnotations.annotateTree(tree));
     	}
-    	
         lexicon = new Lexicon(binarizedTrees);
         grammar = new Grammar(binarizedTrees);
     }
     
     
+    // Build tree
     private Tree<String> backtrackBuildTree(int begin, int end, String tag) {
-    	assert(begin < end && scoreIdx[begin][end] != -1);
+    	if (!(begin < end && scoreIdx[begin][end] != -1)) {
+    		System.err.println("Build tree exception!");
+    	}
+    	
     	HashMap<String, Triplet<Integer, String, String>> back = backTable.get(scoreIdx[begin][end]);
     	Triplet<Integer, String, String> triple = back.get(tag);
     	
+    	// Leaf case
     	if (triple == null) {
     		return new Tree<String>(tag);
     	}
     	
     	// Unary case
     	if (triple.getFirst() == -1) {
-    		Tree<String> subtree = backtrackBuildTree(begin, end, triple.getSecond());
+    		Tree<String> subtree = null;
+    		if (tag.equals(triple.getSecond()))
+    			subtree = new Tree<String>(triple.getSecond());
+    		else subtree = backtrackBuildTree(begin, end, triple.getSecond());
     		Tree<String> ret = new Tree<String>(tag, Collections.singletonList(subtree));
     		return ret;
     	} else {
@@ -82,6 +89,7 @@ public class PCFGParser implements Parser {
     			score.put(tag, lexicon.scoreTagging(sentence.get(i), tag));
     			back.put(tag, new Triplet<Integer, String, String>(-1, sentence.get(i), ""));
     		}
+    		
     		// Handling unary rules
     		boolean added = true;
     		while (added) {
@@ -116,7 +124,11 @@ public class PCFGParser implements Parser {
     			
     			// Binary rules
     			for (int split = begin+1; split <= end-1; ++split) {
-    				assert(scoreIdx[begin][split] != -1 && scoreIdx[split][end] != -1);
+    				
+    				if (!(scoreIdx[begin][split] != -1 && scoreIdx[split][end] != -1)) {
+    					System.err.println("Dynamic programming exception");
+    				}
+    				
     				HashMap<String, Double> left = scoreTable.get(scoreIdx[begin][split]);
     				HashMap<String, Double> right = scoreTable.get(scoreIdx[split][end]);
     				
@@ -161,18 +173,9 @@ public class PCFGParser implements Parser {
     	}
     	
     	
-    	// Backtrack to build tree
-    	assert(scoreIdx[0][sentence.size()] != -1);
-    	HashMap<String, Double> root = scoreTable.get(scoreIdx[0][sentence.size()]);
-    	
-    	String rootTag = null;
-    	double score = Double.NEGATIVE_INFINITY;
-    	for (String s : root.keySet()) {
-    		if (root.get(s) > score) {
-    			score = root.get(s);
-    			rootTag = s;
-    		}
-    	}
-        return TreeAnnotations.unAnnotateTree(backtrackBuildTree(0, sentence.size(), rootTag));
+    	// Backtrack to build tree    	
+    	Tree<String> bestTree = new Tree<String>("ROOT", 
+    			Collections.singletonList(backtrackBuildTree(0, sentence.size(), "S")));
+        return TreeAnnotations.unAnnotateTree(bestTree);
     }
 }
