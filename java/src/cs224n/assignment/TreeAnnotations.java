@@ -6,6 +6,7 @@ import java.util.List;
 
 import cs224n.ling.Tree;
 import cs224n.ling.Trees;
+import cs224n.ling.Trees.MarkovizationAnnotationStripper;
 import cs224n.util.Filter;
 
 /**
@@ -64,8 +65,8 @@ public class TreeAnnotations {
 	public static Tree<String> unAnnotateTree(Tree<String> annotatedTree) {
 
 		// Remove intermediate nodes (labels beginning with "@"
-		// Remove all material on node labels which follow their base symbol 
-		// (cuts at the leftmost -, ^, or : character)
+		// Remove all material on node labels which follow their base symbol
+		// (cuts at the leftmost - or ^ character)
 		// Examples: a node with label @NP->DT_JJ will be spliced out, 
 		// and a node with label NP^S will be reduced to NP
 
@@ -77,6 +78,8 @@ public class TreeAnnotations {
 				});
 		Tree<String> unAnnotatedTree = 
 				(new Trees.FunctionNodeStripper()).transformTree(debinarizedTree);
+    Tree<String> unMarkovizedTree =
+        (new Trees.MarkovizationAnnotationStripper()).transformTree(unAnnotatedTree);
 		return unAnnotatedTree;
 	}
 }

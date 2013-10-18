@@ -42,6 +42,24 @@ public class Trees {
 		}
 	}
 
+  public static class MarkovizationAnnotationStripper implements TreeTransformer<String> {
+      @Override
+      public Tree<String> transformTree(Tree<String> tree) {
+          String transformedLabel = tree.getLabel();
+          int caretIndex = transformedLabel.indexOf('^');
+          if (caretIndex > 0)
+              transformedLabel = new String(transformedLabel.substring(0, caretIndex));
+
+          if (tree.isLeaf())
+              return new Tree<String>(transformedLabel);
+          List<Tree<String>> transformedChildren = new ArrayList<Tree<String>>();
+          for (Tree<String> child : tree.getChildren()) {
+              transformedChildren.add(transformTree(child));
+          }
+          return new Tree<String>(transformedLabel, transformedChildren);
+      }
+  }
+
 	public static class EmptyNodeStripper implements TreeTransformer<String> {
 		public Tree<String> transformTree(Tree<String> tree) {
 			String label = tree.getLabel();

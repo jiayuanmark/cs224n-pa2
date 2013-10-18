@@ -18,49 +18,19 @@ import cs224n.util.Counter;
  */
 public class Grammar {
 
-	
-	public abstract static class Rule {
+	// BinaryRule =================================================================
+
+	/* A binary grammar rule with score representing its probability. */
+	public static class BinaryRule {
+
 		String parent;
+		String leftChild;
+		String rightChild;
 		double score;
-		int split;
-		boolean isTerminal;
-		
-		public boolean isTerminal() {
-			return isTerminal;
-		}
-
-		public void setTerminal(boolean isTerminal) {
-			this.isTerminal = isTerminal;
-		}
-
-		public int getSplit() {
-			return split;
-		}
-
-		public void setSplit(int split) {
-			this.split = split;
-		}
 
 		public String getParent() {
 			return parent;
 		}
-
-		public double getScore() {
-			return score;
-		}
-		
-		public void setScore(double score) {
-			this.score = score;
-		}
-
-	}
-	// BinaryRule =================================================================
-
-	/* A binary grammar rule with score representing its probability. */
-	public static class BinaryRule extends Rule {
-
-		String leftChild;
-		String rightChild;
 
 		public String getLeftChild() {
 			return leftChild;
@@ -68,6 +38,14 @@ public class Grammar {
 
 		public String getRightChild() {
 			return rightChild;
+		}
+
+		public double getScore() {
+			return score;
+		}
+
+		public void setScore(double score) {
+			this.score = score;
 		}
 
 		public boolean equals(Object o) {
@@ -109,12 +87,26 @@ public class Grammar {
 	// UnaryRule ==================================================================
 
 	/** A unary grammar rule with score representing its probability. */
-	public static class UnaryRule extends Rule {
+	public static class UnaryRule {
 
+		String parent;
 		String child;
+		double score;
+
+		public String getParent() {
+			return parent;
+		}
 
 		public String getChild() {
 			return child;
+		}
+
+		public double getScore() {
+			return score;
+		}
+
+		public void setScore(double score) {
+			this.score = score;
 		}
 
 		public boolean equals(Object o) {

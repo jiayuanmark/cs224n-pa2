@@ -1,12 +1,11 @@
 package cs224n.assignment;
 
-import cs224n.assignment.Grammar.*;
 import cs224n.ling.Tree;
-import cs224n.util.PriorityQueue;
+import cs224n.assignment.Grammar.UnaryRule;
+import cs224n.assignment.Grammar.BinaryRule;
+import cs224n.util.Triplet;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 /**
  * The CKY PCFG Parser you will implement.
@@ -14,148 +13,166 @@ import java.util.List;
 public class PCFGParser implements Parser {
     private Grammar grammar;
     private Lexicon lexicon;
-    ArrayList<ArrayList<PriorityQueue<Rule>>> all_scores;
+    
+    
+    // 
+    private int [][] scoreIdx;
+    private List<HashMap<String, Double>> scoreTable;
+    private List<HashMap<String, Triplet<Integer, String, String>>> backTable;
+    
+    
     
     public void train(List<Tree<String>> trainTrees) {
-        // TODO: before you generate your grammar, the training trees
-        // need to be binarized so that rules are at most binary
-      
-      List<Tree<String>> annotated_trainTrees = new ArrayList<Tree<String>>();
-      for (Tree<String> tree : trainTrees) {
-        annotated_trainTrees.add(TreeAnnotations.annotateTree(tree));
-      }
-      
-        lexicon = new Lexicon(annotated_trainTrees);
-        grammar = new Grammar(annotated_trainTrees);
-    }
-
-    public Tree<String> getBestParse(List<String> sentence) {
-       all_scores = 
-          new ArrayList<ArrayList<PriorityQueue<Rule>>>();
-      
-      //filled the pre-terminal score by using lexicon
-      ArrayList<PriorityQueue<Rule>> pre_terminal_scores =
-            new ArrayList<PriorityQueue<Rule>>(sentence.size());
-      for (String word : sentence) {
-          PriorityQueue<Rule> scores = new PriorityQueue<Rule>();
-          for (String tag : lexicon.getAllTags()) {
-            double priority = lexicon.scoreTagging(word, tag);
-            if (priority > 0) {
-              UnaryRule rule = new UnaryRule(tag, word);
-              rule.setTerminal(true);
-              scores.add(rule, priority);
-            }
-          }
-          pre_terminal_scores.add(scores);
-        }
-        ArrayList<PriorityQueue<Rule>> last_rule_scores = pre_terminal_scores;
-        for (int l = sentence.size(); l > 0; l--) {
-            // handle unary rules for those who being added to this level 
-          for (PriorityQueue<Rule> scores : last_rule_scores) {
-            
-            List<Rule> elements = scores.getElements();
-            double[] priorities = scores.getPriorities();
-            while (elements.size() > 0) {
-              ArrayList<Rule> new_elements = new ArrayList<Rule>();
-              double[] new_priorities = new double[elements.size()];
-              for (int i = 0; i < elements.size(); i ++) {
-                for (UnaryRule rule : grammar.getUnaryRulesByChild(elements.get(i).getParent())) {
-                  rule.setTerminal(false);
-                  scores.add(rule, priorities[i] * rule.score);
-                  new_elements.add(rule);
-                  new_priorities[new_elements.size() - 1] = (priorities[i] * rule.score);
-                }
-              }
-              elements = new_elements;
-              priorities = new_priorities;
-            }
-          }
-          
-          ArrayList<PriorityQueue<Rule>> rule_scores =
-              new ArrayList<PriorityQueue<Rule>>();
-          // add binary rule to next level
-          for (int i = 0; i < last_rule_scores.size() - 1; i++) {
-            PriorityQueue<Rule> left_scores = last_rule_scores.get(i);
-            PriorityQueue<Rule> right_scores = last_rule_scores.get(i + 1);
-              
-            List<Rule> left_elements = left_scores.getElements();
-            List<Rule> right_elements = right_scores.getElements();
-            double[] left_priorities = left_scores.getPriorities();
-            double[] right_priorities = right_scores.getPriorities();
-            PriorityQueue<Rule> scores = new PriorityQueue<Rule>();
-            
-            for (int j = 0; j < left_elements.size(); j ++) {
-              for (BinaryRule left_rule : 
-                grammar.getBinaryRulesByLeftChild(left_elements.get(j).getParent())) {
-                for (int k = 0; k < right_elements.size(); k++) {
-                  for (BinaryRule right_rule : 
-                    grammar.getBinaryRulesByLeftChild(right_elements.get(k).getParent())) {
-                    if (left_rule.equals(right_rule)) {
-                      left_rule.setSplit(i + 1);
-                      left_rule.setTerminal(false);
-                      scores.add(left_rule,
-                          left_rule.score * left_priorities[j] * right_priorities[k]);
-                    }
-                  }
-                }
-              }
-            }            
-          }
-          all_scores.add(0, rule_scores);            
-        }
-      return buildTree(0, sentence.size(), sentence.size(), "S");
+    	List<Tree<String>> binarizedTrees = new ArrayList<Tree<String>>();
+    	for (Tree<String> tree : trainTrees) {
+    		binarizedTrees.add(TreeAnnotations.annotateTree(tree));
+    	}
+    	
+        lexicon = new Lexicon(binarizedTrees);
+        grammar = new Grammar(binarizedTrees);
     }
     
-    private Tree<String> buildTree(int begin, int end, int size, String label) {
-    Tree<String> node = new Tree<String>(label);
-      int i = size - (end - begin);
-      int j = begin;
-      if (i < 0 || j < 0)
-        return node;
-    PriorityQueue<Rule> scores = all_scores.get(i).get(j);
-    HashSet<String> applied_symbols = new HashSet<String>();
-    ArrayList<Rule> unapplied_rules = new ArrayList<Rule>();
-    double[] priorities = new double[scores.size()];
-    boolean not_binary = true;
-    Tree<String> current_node = node;
-    while (not_binary) {
-      for (int k = 0; k < unapplied_rules.size(); k++)
-        scores.add(unapplied_rules.get(k), priorities[k]);
-      unapplied_rules.clear();
-      while (scores.hasNext()) {
-        double p = scores.getPriority();
-        Rule r = scores.next();
-        if (!r.getParent().equals(label)) {
-          if (!applied_symbols.contains(r.getParent())) {
-            unapplied_rules.add(r);
-            priorities[unapplied_rules.size() - 1] = p;
-          }
-          continue;
-        }
-        if (r instanceof UnaryRule) {
-          applied_symbols.add(r.getParent());
-          label = ((UnaryRule) r).getChild();
-          Tree<String> child = new Tree<String>(label);
-          current_node.getChildren().add(child);
-          current_node = child;
-          if (r.isTerminal)
-            not_binary = false;
-          break;
-        }
-        if (r instanceof BinaryRule) {
-          String left_label = ((BinaryRule) r).getLeftChild();
-          String right_label = ((BinaryRule) r).getRightChild();
-          Tree<String> left_child = buildTree(begin, r.split, size, left_label);
-          Tree<String> right_child = buildTree(begin, r.split, size, right_label);
-          current_node.getChildren().add(left_child);
-          current_node.getChildren().add(right_child);
-          not_binary = false;
-          break;
-        }
-      }
-      
+    
+    private Tree<String> backtrackBuildTree(int begin, int end, String tag) {
+    	assert(begin < end && scoreIdx[begin][end] != -1);
+    	HashMap<String, Triplet<Integer, String, String>> back = backTable.get(scoreIdx[begin][end]);
+    	Triplet<Integer, String, String> triple = back.get(tag);
+    	
+    	if (triple == null) {
+    		return new Tree<String>(tag);
+    	}
+    	
+    	// Unary case
+    	if (triple.getFirst() == -1) {
+    		Tree<String> subtree = backtrackBuildTree(begin, end, triple.getSecond());
+    		Tree<String> ret = new Tree<String>(tag, Collections.singletonList(subtree));
+    		return ret;
+    	} else {
+    	// Binary case
+    		Tree<String> leftTree = backtrackBuildTree(begin, triple.getFirst(), triple.getSecond());
+    		Tree<String> rightTree = backtrackBuildTree(triple.getFirst(), end, triple.getThird());
+    		List<Tree<String>> child = new ArrayList<Tree<String>>();
+    		child.add(leftTree);
+    		child.add(rightTree);
+     		Tree<String> ret = new Tree<String>(tag, child);
+     		return ret;
+    	}
     }
-    return node;
-  }
+    
 
+    public Tree<String> getBestParse(List<String> sentence) {
+    	
+    	// Initialization
+    	scoreIdx = new int[sentence.size()+1][sentence.size()+1];
+    	
+    	for (int i = 0; i < scoreIdx.length; ++i)
+    		for (int j = 0; j < scoreIdx[0].length; ++j)
+    			scoreIdx[i][j] = -1;
+    	
+    	scoreTable = new ArrayList<HashMap<String, Double>>();
+    	backTable = new ArrayList<HashMap<String, Triplet<Integer, String, String>>>();
+
+    	// Dynamic programming base case
+    	for (int i = 0; i < sentence.size(); ++i) {
+    		HashMap<String, Double> score = new HashMap<String, Double>();
+    		HashMap<String, Triplet<Integer, String, String>> back
+    			= new HashMap<String, Triplet<Integer, String, String>>();
+    		
+    		for (String tag : lexicon.getAllTags()) {
+    			score.put(tag, lexicon.scoreTagging(sentence.get(i), tag));
+    			back.put(tag, new Triplet<Integer, String, String>(-1, sentence.get(i), ""));
+    		}
+    		// Handling unary rules
+    		boolean added = true;
+    		while (added) {
+    			added = false;
+    			Set<String> S = new HashSet<String>(score.keySet());
+    			for (String key : S) {
+    				for  (UnaryRule r : grammar.getUnaryRulesByChild(key)) {
+    					double prob = score.get(key) * r.getScore();
+    					if (!score.containsKey(r.getParent()) || score.get(r.getParent()) < prob) {
+    						score.put(r.getParent(), prob);
+    						back.put(	r.getParent(), 
+    									new Triplet<Integer, String, String>(-1, r.getChild(), ""));
+    						added = true;
+    					}
+    				}
+    			}
+    		}
+    		scoreIdx[i][i+1] = scoreTable.size();
+    		scoreTable.add(score);
+    		backTable.add(back);
+    	}
+    	
+    	
+    	// Dynamic programming
+    	for (int span = 2; span <= sentence.size(); ++span) {
+    		for (int begin = 0; begin <= sentence.size() - span; ++begin) {
+    			
+    			int end = begin + span;
+    			HashMap<String, Double> score = new HashMap<String, Double>();
+    			HashMap<String, Triplet<Integer, String, String>> back
+    				= new HashMap<String, Triplet<Integer, String, String>>();
+    			
+    			// Binary rules
+    			for (int split = begin+1; split <= end-1; ++split) {
+    				assert(scoreIdx[begin][split] != -1 && scoreIdx[split][end] != -1);
+    				HashMap<String, Double> left = scoreTable.get(scoreIdx[begin][split]);
+    				HashMap<String, Double> right = scoreTable.get(scoreIdx[split][end]);
+    				
+    				for (String leftKey : left.keySet()) {
+    					for (BinaryRule br : grammar.getBinaryRulesByLeftChild(leftKey)) {
+    						if (!right.containsKey(br.getRightChild())) continue;
+    						double prob = left.get(br.getLeftChild()) * right.get(br.getRightChild()) 
+    										* br.getScore();
+    						if (!score.containsKey(br.getParent()) || score.get(br.getParent()) < prob) {
+    							score.put(br.getParent(), prob);
+    							back.put(br.getParent(), 
+    									new Triplet<Integer, String, String>
+    									(split, br.getLeftChild(), br.getRightChild()));
+    						}
+    					}
+    				}
+    			}
+    			
+    			// Unary rules
+    			boolean added = true;
+        		while (added) {
+        			added = false;
+        			Set<String> S = new HashSet<String>(score.keySet());
+        			for (String key : S) {
+        				for  (UnaryRule r : grammar.getUnaryRulesByChild(key)) {
+        					double prob = score.get(key) * r.getScore();
+        					if (!score.containsKey(r.getParent()) || score.get(r.getParent()) < prob) {
+        						score.put(r.getParent(), prob);
+        						back.put(r.getParent(), 
+    									new Triplet<Integer, String, String>(-1, r.getChild(), ""));
+        						added = true;
+        					}
+        				}
+        			}
+        		}
+        		
+        		// Add score into table
+        		scoreIdx[begin][end] = scoreTable.size();
+        		scoreTable.add(score);
+        		backTable.add(back);
+    		}
+    	}
+    	
+    	
+    	// Backtrack to build tree
+    	assert(scoreIdx[0][sentence.size()] != -1);
+    	HashMap<String, Double> root = scoreTable.get(scoreIdx[0][sentence.size()]);
+    	
+    	String rootTag = null;
+    	double score = Double.NEGATIVE_INFINITY;
+    	for (String s : root.keySet()) {
+    		if (root.get(s) > score) {
+    			score = root.get(s);
+    			rootTag = s;
+    		}
+    	}
+        return TreeAnnotations.unAnnotateTree(backtrackBuildTree(0, sentence.size(), rootTag));
+    }
 }
