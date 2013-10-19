@@ -25,25 +25,26 @@ public class TreeAnnotations {
 
 		// TODO : mark nodes with the label of their parent nodes, giving a second
 		// order vertical markov process
-		//System.out.println(Trees.PennTreeRenderer.render(binarizeTree(verticalMarkovnizeTree(unAnnotatedTree, ""))));
-		return binarizeTree(verticalMarkovnizeTree(unAnnotatedTree, ""));
+		//System.out.println(Trees.PennTreeRenderer.render(unAnnotatedTree));
+		//System.out.println(Trees.PennTreeRenderer.render(binarizeTree(unAnnotatedTree, 2)));
+		return verticalMarkovnizeTree(binarizeTree(unAnnotatedTree, 2), "");
 
 	}
 
-	private static Tree<String> binarizeTree(Tree<String> tree) {
+	private static Tree<String> binarizeTree(Tree<String> tree, int order) {
 		String label = tree.getLabel();
 		if (tree.isLeaf())
 			return new Tree<String>(label);
 		if (tree.getChildren().size() == 1) {
 			return new Tree<String>
 			(label, 
-					Collections.singletonList(binarizeTree(tree.getChildren().get(0))));
+					Collections.singletonList(binarizeTree(tree.getChildren().get(0), order)));
 		}
 		// otherwise, it's a binary-or-more local tree, 
 		// so decompose it into a sequence of binary and unary trees.
 		String intermediateLabel = "@"+label+"->";
 		Tree<String> intermediateTree =
-				binarizeTreeHelper(tree, 0, intermediateLabel);
+				binarizeTreeHelper(tree, 0, intermediateLabel, order);
 		return new Tree<String>(label, intermediateTree.getChildren());
 	}
 	
@@ -63,15 +64,36 @@ public class TreeAnnotations {
 
 	private static Tree<String> binarizeTreeHelper(Tree<String> tree,
 			int numChildrenGenerated, 
-			String intermediateLabel) {
+			String intermediateLabel,
+			int order) {
 		Tree<String> leftTree = tree.getChildren().get(numChildrenGenerated);
 		List<Tree<String>> children = new ArrayList<Tree<String>>();
-		children.add(binarizeTree(leftTree));
+		children.add(binarizeTree(leftTree, order));
 		if (numChildrenGenerated < tree.getChildren().size() - 1) {
+			String label = intermediateLabel + "_" + leftTree.getLabel();
 			Tree<String> rightTree = 
 					binarizeTreeHelper(tree, numChildrenGenerated + 1, 
-							intermediateLabel + "_" + leftTree.getLabel());
+							label,
+							order);
 			children.add(rightTree);
+		}
+		if (order > 0) {
+			int index = intermediateLabel.indexOf("_");
+			int order_index = -1;
+			int count = 0;
+			while (index >= 0) {
+			    count ++;
+			    index = intermediateLabel.indexOf("_", index + 1);
+			    if (count == order - 1 && index >= 0) {
+			    	order_index = index;
+			    }
+			    if (count == order)
+			    	break;
+			}
+			if (order_index > -1 && count >= order && index >= 0) {
+				intermediateLabel = intermediateLabel.substring(0, order_index) +
+						intermediateLabel.substring(index);
+			}
 		}
 		return new Tree<String>(intermediateLabel, children);
 	} 

@@ -175,7 +175,7 @@ public class PCFGParser implements Parser {
     	
     	// Backtrack to build tree    	
     	Tree<String> bestTree = new Tree<String>("ROOT", 
-    			Collections.singletonList(backtrackBuildTree(0, sentence.size(), "S")));
+    			Collections.singletonList(backtrackBuildTree(0, sentence.size(), "S^ROOT")));
         return TreeAnnotations.unAnnotateTree(bestTree);
     }
 }
