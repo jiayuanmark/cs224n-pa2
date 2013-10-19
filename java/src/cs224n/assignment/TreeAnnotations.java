@@ -25,8 +25,8 @@ public class TreeAnnotations {
 
 		// TODO : mark nodes with the label of their parent nodes, giving a second
 		// order vertical markov process
-
-		return binarizeTree(unAnnotatedTree);
+		//System.out.println(Trees.PennTreeRenderer.render(binarizeTree(verticalMarkovnizeTree(unAnnotatedTree, ""))));
+		return binarizeTree(verticalMarkovnizeTree(unAnnotatedTree, ""));
 
 	}
 
@@ -45,6 +45,20 @@ public class TreeAnnotations {
 		Tree<String> intermediateTree =
 				binarizeTreeHelper(tree, 0, intermediateLabel);
 		return new Tree<String>(label, intermediateTree.getChildren());
+	}
+	
+	private static Tree<String> verticalMarkovnizeTree(Tree<String> tree, String parent_label) {
+		String original_label = tree.getLabel();
+		if (tree.isLeaf())
+			return new Tree<String>(original_label);
+		String label = original_label;
+		if (parent_label != "")
+			label += "^" + parent_label;
+		ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
+		for (Tree<String> node : tree.getChildren()) {
+			children.add(verticalMarkovnizeTree(node, original_label));
+		}
+		return new Tree<String>(label, children);
 	}
 
 	private static Tree<String> binarizeTreeHelper(Tree<String> tree,
@@ -78,8 +92,8 @@ public class TreeAnnotations {
 				});
 		Tree<String> unAnnotatedTree = 
 				(new Trees.FunctionNodeStripper()).transformTree(debinarizedTree);
-    Tree<String> unMarkovizedTree =
-        (new Trees.MarkovizationAnnotationStripper()).transformTree(unAnnotatedTree);
-		return unAnnotatedTree;
+		Tree<String> unMarkovizedTree =
+				(new Trees.MarkovizationAnnotationStripper()).transformTree(unAnnotatedTree);
+		return unMarkovizedTree;
 	}
 }
