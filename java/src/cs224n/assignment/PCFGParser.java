@@ -1,8 +1,8 @@
 package cs224n.assignment;
 
-import cs224n.ling.Tree;
 import cs224n.assignment.Grammar.UnaryRule;
 import cs224n.assignment.Grammar.BinaryRule;
+import cs224n.ling.Tree;
 import cs224n.util.Triplet;
 
 import java.util.*;
@@ -17,8 +17,8 @@ public class PCFGParser implements Parser {
     
     // Data structure 
     private int [][] scoreIdx;
-    private List<HashMap<String, Double>> scoreTable;
-    private List<HashMap<String, Triplet<Integer, String, String>>> backTable;
+    private List<Map<String, Double>> scoreTable;
+    private List<Map<String, Triplet<Integer, String, String>>> backTable;
     
     
     // Training
@@ -38,7 +38,7 @@ public class PCFGParser implements Parser {
     		System.err.println("Build tree exception!");
     	}
     	
-    	HashMap<String, Triplet<Integer, String, String>> back = backTable.get(scoreIdx[begin][end]);
+    	Map<String, Triplet<Integer, String, String>> back = backTable.get(scoreIdx[begin][end]);
     	Triplet<Integer, String, String> triple = back.get(tag);
     	
     	// Leaf case
@@ -70,19 +70,21 @@ public class PCFGParser implements Parser {
     public Tree<String> getBestParse(List<String> sentence) {
     	
     	// Initialization
-    	scoreIdx = new int[sentence.size()+1][sentence.size()+1];
+    	int N = sentence.size() + 1;
+    	scoreIdx = new int[N][N];
     	
     	for (int i = 0; i < scoreIdx.length; ++i)
     		for (int j = 0; j < scoreIdx[0].length; ++j)
     			scoreIdx[i][j] = -1;
     	
-    	scoreTable = new ArrayList<HashMap<String, Double>>();
-    	backTable = new ArrayList<HashMap<String, Triplet<Integer, String, String>>>();
+    	scoreTable = new ArrayList<Map<String, Double>>(N * (N+1) / 2);
+    	backTable = new ArrayList<Map<String, Triplet<Integer, String, String>>>(N * (N+1) / 2);
 
+    	
     	// Dynamic programming base case
     	for (int i = 0; i < sentence.size(); ++i) {
-    		HashMap<String, Double> score = new HashMap<String, Double>();
-    		HashMap<String, Triplet<Integer, String, String>> back
+    		Map<String, Double> score = new HashMap<String, Double>();
+    		Map<String, Triplet<Integer, String, String>> back
     			= new HashMap<String, Triplet<Integer, String, String>>();
     		
     		for (String tag : lexicon.getAllTags()) {
@@ -118,8 +120,8 @@ public class PCFGParser implements Parser {
     		for (int begin = 0; begin <= sentence.size() - span; ++begin) {
     			
     			int end = begin + span;
-    			HashMap<String, Double> score = new HashMap<String, Double>();
-    			HashMap<String, Triplet<Integer, String, String>> back
+    			Map<String, Double> score = new HashMap<String, Double>();
+    			Map<String, Triplet<Integer, String, String>> back
     				= new HashMap<String, Triplet<Integer, String, String>>();
     			
     			// Binary rules
@@ -129,8 +131,8 @@ public class PCFGParser implements Parser {
     					System.err.println("Dynamic programming exception");
     				}
     				
-    				HashMap<String, Double> left = scoreTable.get(scoreIdx[begin][split]);
-    				HashMap<String, Double> right = scoreTable.get(scoreIdx[split][end]);
+    				Map<String, Double> left = scoreTable.get(scoreIdx[begin][split]);
+    				Map<String, Double> right = scoreTable.get(scoreIdx[split][end]);
     				
     				for (String leftKey : left.keySet()) {
     					for (BinaryRule br : grammar.getBinaryRulesByLeftChild(leftKey)) {
@@ -172,8 +174,7 @@ public class PCFGParser implements Parser {
     		}
     	}
     	
-    	
-    	// Backtrack to build tree    	
+    	// Backtrack to build tree
     	Tree<String> bestTree = new Tree<String>("ROOT", 
     			Collections.singletonList(backtrackBuildTree(0, sentence.size(), "S^ROOT")));
         return TreeAnnotations.unAnnotateTree(bestTree);

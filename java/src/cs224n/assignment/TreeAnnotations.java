@@ -27,8 +27,8 @@ public class TreeAnnotations {
 		// order vertical markov process
 		//System.out.println(Trees.PennTreeRenderer.render(unAnnotatedTree));
 		//System.out.println(Trees.PennTreeRenderer.render(binarizeTree(unAnnotatedTree, 2)));
+		//return binarizeTree(unAnnotatedTree, -1);
 		return verticalMarkovnizeTree(binarizeTree(unAnnotatedTree, 2), "");
-
 	}
 
 	private static Tree<String> binarizeTree(Tree<String> tree, int order) {
