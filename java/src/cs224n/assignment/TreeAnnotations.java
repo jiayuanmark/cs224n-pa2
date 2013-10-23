@@ -26,9 +26,9 @@ public class TreeAnnotations {
 		// TODO : mark nodes with the label of their parent nodes, giving a second
 		// order vertical markov process
 		//System.out.println(Trees.PennTreeRenderer.render(unAnnotatedTree));
-		//System.out.println(Trees.PennTreeRenderer.render(binarizeTree(unAnnotatedTree, 2)));
+		//System.out.println(Trees.PennTreeRenderer.render(verticalMarkovnizeTree(binarizeTree(unAnnotatedTree, 2), "", 2)));
 		//return binarizeTree(unAnnotatedTree, -1);
-		return verticalMarkovnizeTree(binarizeTree(unAnnotatedTree, 2), "");
+		return binarizeTree(verticalMarkovnizeTree(unAnnotatedTree, "", 2), 2);
 	}
 
 	private static Tree<String> binarizeTree(Tree<String> tree, int order) {
@@ -48,16 +48,30 @@ public class TreeAnnotations {
 		return new Tree<String>(label, intermediateTree.getChildren());
 	}
 	
-	private static Tree<String> verticalMarkovnizeTree(Tree<String> tree, String parent_label) {
+	private static Tree<String> verticalMarkovnizeTree(Tree<String> tree, String parent_label, int order) {
 		String original_label = tree.getLabel();
 		if (tree.isLeaf())
 			return new Tree<String>(original_label);
 		String label = original_label;
 		if (parent_label != "")
 			label += "^" + parent_label;
+		int count = 0;
+		int order_index = -1;
+		for (int i = 0; i < label.length() - 1; i++) {
+			if (label.charAt(i) == '^') {
+				count ++;
+				order_index = i;
+			}
+			if (count == order + 1)
+				break;
+		}
+		// take off the parent label beyond vertical order
+		if (count == order + 1)
+			label = label.substring(0, order_index);
+		
 		ArrayList<Tree<String>> children = new ArrayList<Tree<String>>();
 		for (Tree<String> node : tree.getChildren()) {
-			children.add(verticalMarkovnizeTree(node, original_label));
+			children.add(verticalMarkovnizeTree(node, label, order));
 		}
 		return new Tree<String>(label, children);
 	}
@@ -78,21 +92,21 @@ public class TreeAnnotations {
 			children.add(rightTree);
 		}
 		if (order > 0) {
-			int index = intermediateLabel.indexOf("_");
 			int order_index = -1;
 			int count = 0;
-			while (index >= 0) {
-			    count ++;
-			    index = intermediateLabel.indexOf("_", index + 1);
-			    if (count == order - 1 && index >= 0) {
-			    	order_index = index;
-			    }
-			    if (count == order)
-			    	break;
+			for (int i = intermediateLabel.length() - 1; i >= 0; i--) {
+				if (intermediateLabel.charAt(i) == '_') {
+					count ++;
+					order_index = i;
+				}
+				if (count == order)
+					break;
 			}
-			if (order_index > -1 && count >= order && index >= 0) {
-				intermediateLabel = intermediateLabel.substring(0, order_index) +
-						intermediateLabel.substring(index);
+			if (count == order) {
+				int pos = intermediateLabel.indexOf('>');
+				// omit the thing beyond our horizontal order
+				intermediateLabel = intermediateLabel.substring(0, pos + 1) 
+						+ "..." + intermediateLabel.substring(order_index);
 			}
 		}
 		return new Tree<String>(intermediateLabel, children);
