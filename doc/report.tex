@@ -55,8 +55,8 @@ to avoid the overhead of memory copying and reallocation.
 \end{itemize}
 
 For backtracking, we use \texttt{backTable} to store necessary information needed to construct parse tree after dynamic programming.
-For each entry of \texttt{HashMap} in \texttt{backTable}, we store a mapping from nonterminals to triplets, each of which contains splitting point, left subtree labels, and right subtree labels.
-For unary rules, we marked splitting point of the triplets as $-1$ to indicate that we have a single child to expand from here.
+For each entry of \texttt{HashMap} in \texttt{backTable}, we store a mapping from a nonterminal to a triplet, which contains splitting point, left subtree labels, and right subtree labels.
+For unary rules, we marked splitting point of the triplets as $-1$ so that we know we have only a single child to expand.
 During backtracking, if we want to access additional information with respect to a particular \texttt{(begin, end)} pair, we simply retrieve the corresponding \texttt{HashMap} by using the translation stored in \texttt{scoreIdx}.
 
 \vspace{0.25cm}
@@ -70,7 +70,7 @@ backTable.add(back);
 \end{verbatim}
 
 \subsection{Unlexicalized Parsing (Extra Credit)}
-The plain CKY parsing is not enough for some complicated cases. Sometimes in different contexts a word may serve as different purposes. For example, a verb may be used as an adjective. In this case, we want to split a verb phrase (VP) tag to several different ones based on the context. The idea of \textit{vertical markovization}, using tags from parent or even ancestor to split a tag, solves this problem. Therefore we can learn more specific rule for each particular situation.
+The plain CKY parsing is not enough for some complicated cases. Sometimes in different contexts a word may serve as different purposes. For example, a verb may be used as an adjective. In this case, we want to split a verb phrase (VP) tag to several different ones based on the context. The idea of \textit{vertical markovization}, using tags from parent or even ancestor to split a tag, solves this problem. Therefore, we can learn more fine-grained rules for different contexts.
 However, vertical markovization creates too many different rules for CKY algoithm and we use \textit{horizontal markovizations} to reduce rules so that we can strike a balance of computational overhead. 
 
 \begin{itemize}
@@ -132,7 +132,7 @@ Interestingly, 3rd order vertical markovization gave an exceptionally high EX sc
 
 While we were implementing the horizontal markovization, we mistakenly preserved the farthest away tags instead of the most recent tags.\footnote{We followed this StackOverflow link here:  \texttt{http://stackoverflow.com/questions/12884411/horizontal-markovization}.}
 For example, \texttt{NP->VP->ADJP->NNP} was annotated as \texttt{NP->\dots->NNP}  instead of \texttt{\dots->ADJP->NNP}. Surprisingly, the implementation with this particular bug actually produced the highest recall and F1 score (see the 4th row of Table \ref{tab:prec}).
-Our guess is that this bug worked so well is because it took into account some long-range dependencies which were missing from the classical horizontal markovizations and helped to parse some sentences with long-rang dependencies or modifiers.
+Our guess is that this bug worked so well is because it took into account some long-range dependencies which were missing from the classical horizontal markovizations and helped to parse some sentences with long-range dependencies.
 
 
 \subsection{Error Analysis}
@@ -190,6 +190,9 @@ Now we introduce the vertical markovization to fix this problem, and here is the
             	(VP^VP (VBN^VP begun)))))
 \end{verbatim}
 We observe that by splitting the RB tag and VBN tag by annotate them with their parent and ancestor, we successfully parsed it with correct tag since we learn a separate rule for RB and VBN in this situation.
+
+\vspace{0.25cm}
+
 Another observed problem is that sometimes the highest score parsing may not lead to a sentence
 (label ``S'').
 \begin{verbatim}
