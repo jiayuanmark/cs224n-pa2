@@ -28,13 +28,13 @@
 \section{Implementation Detail}
 
 \subsection{CKY parsing}
-Following the pseudo code given in the lecture notes, we implemented the CKY parsing algorithm.  Instead of allocating a single large three dimensional array for dynamic programming, we store our dynamic programming results and backtracking information as two single dimensional arrays. 
-In addition, we use a two dimensional array \texttt{scoreIdx} to record the mapping from \texttt{(begin, end)} pair to the index \texttt{scoreIdx(begin, end)} of these single dimensional flat arrays.
+Following the pseudo code given in the lecture notes, we implemented the CKY parsing algorithm.  Instead of allocating a single large three dimensional array for dynamic programming, we store our dynamic programming results and backtracking information in two single dimensional arrays. 
+In addition, we use a two dimensional array \texttt{scoreIdx} to record the mapping from \texttt{(begin, end)} pair to the index \texttt{scoreIdx(begin, end)} of these two single dimensional flat arrays.
 
 \vspace{0.25cm}
 
 The following are the definitions of data structures used in our implementation of CKY algorithm. As explained before,
-\texttt{scoreTable} and \texttt{backTable} are two single dimensional arrays for dynamic programming and backtracking. \texttt{scoreIdx} is used for translating two dimensional \texttt{(begin, end)} pairs into the singleton indices of \texttt{scoreTable} and \texttt{backTable}.
+\texttt{scoreTable} and \texttt{backTable} are two single dimensional arrays used in dynamic programming and backtracking. \texttt{scoreIdx} is used to translate from two dimensional \texttt{(begin, end)} pairs into the singleton indices of \texttt{scoreTable} and \texttt{backTable}.
 
 \begin{verbatim}
 // Single dimensional array for the score
@@ -45,45 +45,99 @@ private List<Map<String, Triplet<Integer, String, String>>> backTable;
 private int [][] scoreIdx
 \end{verbatim}
 
-During dynamic programming, it is observed that we do NOT need to delete any elements from arrays. Therefore, we chose to use \texttt{ArrayList} and \texttt{HashMap} in our implementation.
+During dynamic programming, it is observed that we do NOT need to delete any elements from arrays. Therefore, we chose \texttt{ArrayList} and \texttt{HashMap} in our implementation.
 
 \begin{itemize}
-\item \texttt{ArrayList} supports $O(1)$ random element accesses and amortized $O(1)$ element insertions. Since we know in advance there will be exactly $(N+1) N / 2$ elements in the array, where $N = 1 + \#\textrm{of words in the sentence}$. We can allocate $(N+1) N/2$ slots ahead of time
-to avoid copying and reallocation.
+\item \texttt{ArrayList} supports $O(1)$ random element accesses and amortized $O(1)$ element insertions. Since we know in advance there will be exactly $(N+1) N / 2$ elements in the array, where $N = \Big( 1 + \#\textrm{of words in the sentence} \Big)$. We can allocate $(N+1) N/2$ slots ahead of time
+to avoid the overhead of memory copying and reallocation.
 
 \item \texttt{HashMap} stores $\textrm{Nonterminal} \Longrightarrow \textrm{probability}$ mappings for a specific word span of \texttt{(begin, end)}. Given a decent hash function, \texttt{HashMap} supports $O(1)$ element accesses and insertions, which is good enough in our application.
 \end{itemize}
 
-On the other hand, we use \texttt{backTable} to store backtrack information needed to construct parse tree after dynamic programming.
-For each entry of \texttt{HashMap} in \texttt{backTable}, we store a mapping from nonterminals to triplets, where each triplets contain splitting point, left subtree labels, and right subtree labels.
-For unary rules, we marked the splitting point of the triplet as $-1$ to indicate that we have an unary rule here.
-During backtracking, if we want to access additional information with respect to a particular \texttt{(begin, end)} pair, we simply retrieve the \texttt{HashMap} by
+For backtracking, we use \texttt{backTable} to store necessary information needed to construct parse tree after dynamic programming.
+For each entry of \texttt{HashMap} in \texttt{backTable}, we store a mapping from nonterminals to triplets, each of which contains splitting point, left subtree labels, and right subtree labels.
+For unary rules, we marked splitting point of the triplets as $-1$ to indicate that we have a single child to expand from here.
+During backtracking, if we want to access additional information with respect to a particular \texttt{(begin, end)} pair, we simply retrieve the corresponding \texttt{HashMap} by using the translation stored in \texttt{scoreIdx}.
 
 \vspace{0.25cm}
 
 Finally, the translation mapping \texttt{scoreIdx} is built on-the-fly.
-When we are filling the ``grid'' in CKY algorithm, we simply append the score and backtrack information to the corresponding array, and record their locations in \texttt{scoreIdx} for future look-ups.
-
+When we are filling the ``grid'' in CKY algorithm, we simply append the score and backtrack information to the corresponding array, and record their locations in \texttt{scoreIdx} for future look-ups. A sample code snippet is given as follows.
 \begin{verbatim}
 scoreIdx[begin][end] = scoreTable.size();
 scoreTable.add(score);
 backTable.add(back);
 \end{verbatim}
 
-\subsection{Tree Annotation}
-We add a vertical markovization helper method, which take order as a parameter. It can decide how many level of parents nodes needed to be in the appending label of a tree node. 
-For horizontal markovization, we simply add a forgetting procedure inside the binarization method provided. When we found the label has too many previous state, we will forgot them and leave the most recent labels only.
+\subsection{Unlexicalized Parsing (Extra Credit)}
+The plain CKY parsing is not enough for some complicated cases. Sometimes in different contexts a word may serve as different purposes. For example, a verb may be used as an adjective. In this case, we want to split a verb phrase (VP) tag to several different ones based on the context. The idea of \textit{vertical markovization}, using tags from parent or even ancestor to split a tag, solves this problem. Therefore we can learn more specific rule for each particular situation.
+However, vertical markovization creates too many different rules for CKY algoithm and we use \textit{horizontal markovizations} to reduce rules so that we can strike a balance of computational overhead. 
+
+\begin{itemize}
+\item \textbf{vertical markovization}
+We implemented a vertical markovization method which can incorporate parent annotations of any order in the tree. It recursively append parent labels to child and cut those labels which is beyond the scope. 
+\item \textbf{horizontal markovization}
+We implemented the horizontal markovization by modifying the \texttt{binarizeTree} method. The original \texttt{binarizeTree} is a loseless binarization. We add a parameter to control how many tags can be preserved in the generated intermediate label.
+\end{itemize}
 
 
+\section{Performance Evaluation}
+Our experiment results are aggregated in Table \ref{tab:prec}, all of which are averaged performance measures on $155$ sentences (with the default max length $20$) from Treebank data set. We also timed our implementation (in Table \ref{tab:time}) of vanilla CKY and CKY with markovizations on a $2.3$Ghz MacPro using $800$MB memory on the same data set.
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+Algorithm & Precision & Recall & F1 score & EX score \\
+\hline
+Vanilla CKY & 81.31 & 75.58   & 78.34  & 20.65 \\
+\hline
+CKY + 2nd-order vertical markovization &
+83.71 & 81.33  & 82.50  & 32.26 \\
+\hline
+CKY + 2nd-order vertical \& 2nd-order horizontal markovization &
+\textbf{84.59}  & 82.63  & 83.60  & 33.55 \\
+\hline
+CKY + 2nd-order vertical \& (distant) horizontal markovization &
+83.82 & \textbf{85.06 } & \textbf{84.44}  & 29.03 \\
+\hline
+CKY + 3rd-order vertical \& 2nd-order horizontal &
+84.02 & 84.47  & 84.24  & \textbf{37.42} \\
+\hline
+\end{tabular}
+\caption{Aggregated results of CKY and its variants with markovization on Treebank dataset}\label{tab:prec}
+\end{center}
+\end{table}
 
-\section{Performance Evaluation} 
-of Standard CKY Parsing
-We ran a plain CKY parsing and a CKY parsing with 2nd order vertical for result comparison. 
-Result: [Average]    P: 81.31   R: 75.58   F1: 78.34   EX: 20.65
-The subset of grammar being parsed well:
-The most simple case, which a sentence only contains one VP and verbs with variation does not appear a lot in the sentence seems to be parsed nearly perfect. As the miniTest example. Those tree tend to have small level.
-Ex 1:
- 
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+Algorithm & Running time for $155$ sentences (secs) \\
+\hline
+Vanilla CKY & $660.91$ \\
+\hline
+CKY with markovization & $2194.90$ \\
+\hline
+\end{tabular}
+\caption{Running time of CKY with/without markovization on $155$ sentences with at most $20$ words}\label{tab:time}
+\end{center}
+\end{table}
+In general, adding markovization (whether vertical or horizontal) helps to boost the performance, which is expected. Another general observation is that vertical markovization seems to give a higher performance gain than horizontal markovization.
+
+In addition to the required 2nd order vertical markovization, we also implemented horizontal markovization as described in the implementation section. It didn't increase the accuracy of parsing a lot when compared to  vertical markovization. On the other hand, adding horizontal markovization did not have a significant running time gain as expected. We think this is due to that the number of grammar rules that have $4$ or $5$ nonterminals is comparatively small, which makes no big difference. 
+We also tested the 3rd order vertical markovization since our implementation of vertical markovization can take an arbitrary parameter to control the number of orders we want.
+Interestingly, 3rd order vertical markovization gave an exceptionally high EX score.
+
+\vspace{0.25cm}
+
+While we were implementing the horizontal markovization, we mistakenly preserved the farthest away tags instead of the most recent tags.\footnote{We followed this StackOverflow link here:  \texttt{http://stackoverflow.com/questions/12884411/horizontal-markovization}.}
+For example, \texttt{NP->VP->ADJP->NNP} was annotated as \texttt{NP->\dots->NNP}  instead of \texttt{\dots->ADJP->NNP}. Surprisingly, the implementation with this particular bug actually produced the highest recall and F1 score (see the 4th row of Table \ref{tab:prec}).
+Our guess is that this bug worked so well is because it took into account some long-range dependencies which were missing from the classical horizontal markovizations and helped to parse some sentences with long-rang dependencies or modifiers.
+
+
+\subsection{Error Analysis}
+Vanilla CKY parsing performs well in relative simple sentences. The parsing trees generated from those sentences tend to have both small depth and breadth. The following is an example.
+\begin{verbatim} 
 (ROOT
   (S
     (PP (IN At)
@@ -98,10 +152,11 @@ Ex 1:
     (VP (VBD were)
       (VP (VBN traded)))
     (. .)))
+\end{verbatim}
 
-
-To mark the verb to correct tag is a huge challenge. Since verb may have different tense and some time verb does not necessary means a VP appear, it may just be serving as a ADJP/ADVP purpose, while sometimes vice versa. The simple learning algorithm did not deal with this situation well.
-Ex 2:
+In this example, we demonstrate a case where an adverb and a past participle verb appears together being recognized as an adjective phrase because this is a common phenomenon in English sentences. However in this example, since “begun” is inside a verbal phrases, it should also be recognized as a verb instead.
+\begin{verbatim}
+Gold Tree:
 (ROOT
   (S
     (NP (DT The) (NN finger-pointing))
@@ -109,24 +164,35 @@ Ex 2:
       (ADVP (RB already))
       (VP (VBN begun)))
     (. .)))
-Plain Guess:
+    
+Vanilla CKY Results:
 (ROOT
   (S
     (NP (DT The) (NN finger-pointing))
     (VP (VBZ has)
       (ADJP (RB already) (VBN begun)))
     (. .)))
-In the plain mode, since @VP->_VBZ is dominated by ADJP, as verb must be followed by adjective. So the already begun is not being tagged correctly.
+\end{verbatim}
+
+This is the portion of parsing tree for ``has already begun'' before the unbinarization of CKY parsing.
+\begin{verbatim}
 (VP (VBZ has)
         (@VP->_VBZ
           (ADJP (RB already)
             (@ADJP->_RB (VBN begun)))))
-
-Verb Challenge is actually a special case of the deficiency in the plain CKY parsing, when a tag is dominated by a special rule. Like we normally will assume tight is an adjective, but when it is following after a adverb and under a VP, it should be an adverb. The parser will ignore other parsing path and lead to a not desired result. 
-In summary, it is hard for parser to learn multiple rule for one semantic type. Since in our setting, we simply compare the probability score of one particular semantic type. 
-
-Another problem is sometime the highest score parsing may not lead to a sentence (label ‘S’)
-ex:
+\end{verbatim}
+Now we introduce the vertical markovization to fix this problem, and here is the portion of new parsing tree for ``has already begun''.
+\begin{verbatim}
+(VP^S (VBZ^VP has)
+        (@VP^S->_VBZ^VP
+         	 (ADVP^VP (RB^ADVP already))
+          	 (@VP^S->_VBZ^VP_ADVP^VP
+            	(VP^VP (VBN^VP begun)))))
+\end{verbatim}
+We observe that by splitting the RB tag and VBN tag by annotate them with their parent and ancestor, we successfully parsed it with correct tag since we learn a separate rule for RB and VBN in this situation.
+Another observed problem is that sometimes the highest score parsing may not lead to a sentence
+(label ``S'').
+\begin{verbatim}
 Guess:
 (ROOT
   (PRN (-LRB- -LRB-)
@@ -143,76 +209,10 @@ Guess:
           ('' '') (: --)
           (NP (NNP WSJ) (NNP Oct.) (CD 16) (, ,) (CD 1989)))))
     (-RRB- -RRB-)))
-
-The precision and recall is 0 in this particular case.
-
-2nd order vertical markovization may be a fixed for the dominant issue. By adding parent node tag into label, it actually split the tag to several. And we can do the counting under each of them. which gives the parsing more possible rules to choose from.
-The result: [Average]    P: 83.71   R: 81.33   F1: 82.50   EX: 32.26
-
-With vertical markovization, it guess Ex2 100% correct. Here it learns different rule specify by parent annotation. It constuct a parsing tree for “has already begun” like:
-(VP^S (VBZ^VP has)
-        (@VP^S->_VBZ^VP
-         	 (ADVP^VP (RB^ADVP already))
-          	 (@VP^S->_VBZ^VP_ADVP^VP
-            	(VP^VP (VBN^VP begun)))))
-
-it can learn ADVP^VP combines with another VP is actually appear a lot under VP->VBZ^VP specific category, so begun can be correctly identify as an VBN under a VP.
-
-But it may still not be able to split the tag enough for correct grammar to be learned. And larger grammar space may lead us learn some not valuable and misleading rule, for Ex 3:
-
-Plain Guess:
-(ROOT
-  (S
-    (NP (DT The) (NNS futures) (NN halt))
-    (VP (VBD was) (RB even)
-      (VP (VBD assailed)
-        (PP (IN by)
-          (NP (NNP Big) (NNP Board) (NN floor) (NNS traders)))))
-    (. .)))
-
-Parent annotated guess:
-    (NP (DT The) (NNS futures) (NN halt))
-    (VP (VBD was)
-      (SBAR (RB even)
-        (S
-          (VP (VBD assailed)
-            (PP (IN by)
-              (NP (NNP Big) (NNP Board) (NN floor) (NNS traders)))))))
-    (. .)))
-
-Gold:
-(ROOT
-  (S
-    (NP (DT The) (NNS futures) (NN halt))
-    (VP (VBD was)
-      (ADVP (RB even))
-      (VP (VBN assailed)
-        (PP (IN by)
-          (NP (NNP Big) (NNP Board) (NN floor) (NNS traders)))))
-    (. .)))
-Here we classify the “even assailed by …” as a cause when using parent annotation. It is because it see more VP^S then a simple VP. This should be solved by the reference paper suggest, shouldn’t parent annotate all the node. Some human-defined rule should be used in order to prevent split the grammar over greedy.
-
-
-
-
-Possible Improvement
-The problem of split tag is it may create too many rules and make the probability score of rule not reliable since it might not be able to aggregate enough samples for one particular rule. And some rule are not useful so we should not populate it at all. So we also implement the horizontal markovization to merge tags by forgetting the far away states.
-
-Implemented Extension and Analysis
-As describe above, we implement horizontal markovization by modify the binarization to take a order parameter for forgetting states. By doing this we try to merge states together to avoid create a over-large grammar space.
-Result: [Average]   P: 84.59   R: 82.63   F1: 83.60   EX: 33.55 
-
-The improvement does not seems to be huge. FIXME
-
-We also tune the vertical markovization order to be 3 and test again. 
-Result: [Average]    P: 84.02   R: 84.47   F1: 84.24   EX: 37.42
-This is the final version we submitted for machine grading.
-
-We also try some other heuristic. For horizontal markovization, instead of only remember 
 \end{verbatim}
 
-
-
+\subsection{Possible Improvement}
+The biggest issue of vertical markovization is that it will introduce too many tags and it will make the learned grammar overfit to the training data. Though horizontal markovization has the potential to merge the tags back, it may be better that we only add some specific vertical markovization to a manually defined subset of tags, for example, verbal phrase has a higher chance to be interpreted differently while an adverb can hardly be recognized as something else.
 
 
 \end{document}
