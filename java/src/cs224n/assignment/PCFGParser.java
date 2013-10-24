@@ -17,7 +17,9 @@ public class PCFGParser implements Parser {
     
     // Data structure 
     private int [][] scoreIdx;
+    // Single Dimenionized Array for Storing score for given begin/end
     private List<Map<String, Double>> scoreTable;
+    // Single Dimenionzied Array for Storing the backtrack information for given begin/end
     private List<Map<String, Triplet<Integer, String, String>>> backTable;
     
     
@@ -45,9 +47,10 @@ public class PCFGParser implements Parser {
     	if (triple == null) {
     		return new Tree<String>(tag);
     	}
-    	
-    	// Unary case
+    	 	
     	if (triple.getFirst() == -1) {
+    		// Unary case
+    		// Backtrack to build the sole children node.
     		Tree<String> subtree = null;
     		if (tag.equals(triple.getSecond()))
     			subtree = new Tree<String>(triple.getSecond());
@@ -55,7 +58,8 @@ public class PCFGParser implements Parser {
     		Tree<String> ret = new Tree<String>(tag, Collections.singletonList(subtree));
     		return ret;
     	} else {
-    	// Binary case
+    		// Binary case
+    		// Backtrack to build the children nodes.
     		Tree<String> leftTree = backtrackBuildTree(begin, triple.getFirst(), triple.getSecond());
     		Tree<String> rightTree = backtrackBuildTree(triple.getFirst(), end, triple.getThird());
     		List<Tree<String>> child = new ArrayList<Tree<String>>();
@@ -92,7 +96,7 @@ public class PCFGParser implements Parser {
     			back.put(tag, new Triplet<Integer, String, String>(-1, sentence.get(i), ""));
     		}
     		
-    		// Handling unary rules
+    		// Handling unary rules, apply as much as rule until no unary rule can be applied
     		boolean added = true;
     		while (added) {
     			added = false;
@@ -140,6 +144,7 @@ public class PCFGParser implements Parser {
     						double prob = left.get(br.getLeftChild()) * right.get(br.getRightChild()) 
     										* br.getScore();
     						if (!score.containsKey(br.getParent()) || score.get(br.getParent()) < prob) {
+    							// Filled the CKY table and track the split information
     							score.put(br.getParent(), prob);
     							back.put(br.getParent(), 
     									new Triplet<Integer, String, String>
@@ -158,6 +163,7 @@ public class PCFGParser implements Parser {
         				for  (UnaryRule r : grammar.getUnaryRulesByChild(key)) {
         					double prob = score.get(key) * r.getScore();
         					if (!score.containsKey(r.getParent()) || score.get(r.getParent()) < prob) {
+        						// Filled the CKY table and track the split information
         						score.put(r.getParent(), prob);
         						back.put(r.getParent(), 
     									new Triplet<Integer, String, String>(-1, r.getChild(), ""));
@@ -167,7 +173,9 @@ public class PCFGParser implements Parser {
         			}
         		}
         		
-        		// Add score into table
+        		// Add score into table, scoreIdx will store the index of
+        		// score and back locate in their list for given begin/end
+        		// We use it for backtracking. 
         		scoreIdx[begin][end] = scoreTable.size();
         		scoreTable.add(score);
         		backTable.add(back);
